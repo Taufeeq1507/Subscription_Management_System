@@ -50,31 +50,31 @@ def generate_invoice_for_subscription(sub: Subscription, billing_date=None):
     Idempotently generates a single Invoice for a subscription's current billing cycle.
     Returns (invoice, created_bool). Never bills twice for the same cycle.
     """
-    cycle_start = sub.next_billing_date
     today = billing_date or timezone.now().date()
-
-    # Check auto-close rule before billing
-    if sub.expiry_date and today > sub.expiry_date and sub.plan.auto_close:
-        sub.status = Subscription.Status.CLOSED
-        sub.save(update_fields=['status'])
-        return None, False
-
-    # Idempotency check: prevent duplicate billing for the same cycle
-    existing = Invoice.objects.filter(
-        subscription=sub,
-        billing_period_start=cycle_start
-    ).first()
-    if existing:
-        return existing, False
-
-    cycle_end = sub.plan.get_next_billing_date(cycle_start) - timedelta(days=1)
-    due_date = today + timedelta(days=sub.get_due_days())
-
-    lines = list(sub.lines.select_related('product', 'variant', 'tax_rule').all())
-    if not lines:
-        return None, False
-
     with transaction.atomic():
+        sub = Subscription.objects.select_for_update().get(pk=sub.pk)
+        cycle_start = sub.next_billing_date
+
+        # Check auto-close rule before billing
+        if sub.expiry_date and today > sub.expiry_date and sub.plan.auto_close:
+            sub.status = Subscription.Status.CLOSED
+            sub.save(update_fields=['status'])
+            return None, False
+
+        # Idempotency check: prevent duplicate billing for the same cycle
+        existing = Invoice.objects.filter(
+            subscription=sub,
+            billing_period_start=cycle_start
+        ).first()
+        if existing:
+            return existing, False
+
+        cycle_end = sub.plan.get_next_billing_date(cycle_start) - timedelta(days=1)
+        due_date = today + timedelta(days=sub.get_due_days())
+
+        lines = list(sub.lines.select_related('product', 'variant', 'tax_rule').all())
+        if not lines:
+            return None, False
         subtotal = sum((l.untaxed_amount for l in lines), Decimal('0.00'))
         total_qty = sum(l.quantity for l in lines)
 
