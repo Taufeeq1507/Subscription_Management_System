@@ -1,0 +1,259 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="mb-6 flex justify-between items-center">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900">Catalog, Plans, Taxes & Discounts</h1>
+        <p class="text-sm text-slate-500">Configure products, variants, recurring plans, quotation templates, and automated discount rules.</p>
+    </div>
+    {% if not user.is_admin_role %}
+        <span class="text-xs bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg font-medium border border-amber-200">
+            Read-Only View: Only Admins can create or modify catalog rules.
+        </span>
+    {% endif %}
+</div>
+
+<!-- Section 1: Products & Variants -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="px-5 py-3.5 border-b border-slate-200 font-bold text-sm bg-slate-50">Products & Variant Pricing</div>
+        <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
+                <tr>
+                    <th class="px-4 py-2.5">Product</th>
+                    <th class="px-4 py-2.5">Type</th>
+                    <th class="px-4 py-2.5">Sales / Cost</th>
+                    <th class="px-4 py-2.5">Tax</th>
+                    <th class="px-4 py-2.5">Variants (+Price Extra)</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for p in products %}
+                <tr>
+                    <td class="px-4 py-3 font-semibold text-slate-900">
+                        {{ p.name }}
+                        {% if p.notes %}<p class="text-xs text-slate-400 font-normal">{{ p.notes }}</p>{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-xs">{{ p.get_product_type_display }}</td>
+                    <td class="px-4 py-3">₹{{ p.sales_price }} <span class="text-xs text-slate-400">/ ₹{{ p.cost_price }}</span></td>
+                    <td class="px-4 py-3 text-xs">{{ p.tax_rule.name|default:"None" }}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex flex-wrap gap-1">
+                            {% for v in p.variants.all %}
+                                <span class="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded">
+                                    {{ v.attribute_name }}: {{ v.attribute_value }} (+₹{{ v.price_extra }})
+                                </span>
+                            {% empty %}
+                                <span class="text-xs text-slate-400">Standard</span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if user.is_admin_role %}
+    <div class="space-y-6">
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="font-bold text-sm mb-3">Add New Product</h3>
+            <form method="post" class="space-y-2.5">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="product">
+                {% for field in product_form %}
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-0.5">{{ field.label }}</label>
+                        {{ field }}
+                    </div>
+                {% endfor %}
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-xs font-semibold">Save Product</button>
+            </form>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="font-bold text-sm mb-3">Add Product Variant (e.g. Brand: Odoo +560)</h3>
+            <form method="post" class="space-y-2.5">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="variant">
+                {% for field in variant_form %}
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-0.5">{{ field.label }}</label>
+                        {{ field }}
+                    </div>
+                {% endfor %}
+                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2 rounded-lg text-xs font-semibold">Add Variant</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Section 2: Subscription Plans & Lifecycle Rules -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="px-5 py-3.5 border-b border-slate-200 font-bold text-sm bg-slate-50">Subscription Plans & Lifecycle Permissions</div>
+        <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
+                <tr>
+                    <th class="px-4 py-2.5">Plan Name</th>
+                    <th class="px-4 py-2.5">Billing Cycle</th>
+                    <th class="px-4 py-2.5">Min Qty</th>
+                    <th class="px-4 py-2.5">Availability</th>
+                    <th class="px-4 py-2.5">Allowed Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for plan in plans %}
+                <tr>
+                    <td class="px-4 py-3 font-semibold">{{ plan.name }} <div class="text-xs text-slate-400">Base: ₹{{ plan.base_price }}</div></td>
+                    <td class="px-4 py-3"><span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-semibold">{{ plan.get_billing_period_display }}</span></td>
+                    <td class="px-4 py-3">{{ plan.min_quantity }}</td>
+                    <td class="px-4 py-3 text-xs">{{ plan.available_from }} &rarr; {{ plan.available_to|default:"Ongoing" }}</td>
+                    <td class="px-4 py-3 text-xs space-x-1">
+                        {% if plan.auto_close %}<span class="bg-slate-100 px-1.5 py-0.5 rounded">Auto-Close</span>{% endif %}
+                        {% if plan.can_close_early %}<span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">Early Close</span>{% endif %}
+                        {% if plan.can_pause %}<span class="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">Pause</span>{% endif %}
+                        {% if plan.can_renew %}<span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">Renew</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if user.is_admin_role %}
+    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <h3 class="font-bold text-sm mb-3">Create Subscription Plan</h3>
+        <form method="post" class="space-y-2.5">
+            {% csrf_token %}
+            <input type="hidden" name="form_type" value="plan">
+            {% for field in plan_form %}
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-0.5">{{ field.label }}</label>
+                    {{ field }}
+                </div>
+            {% endfor %}
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-xs font-semibold">Save Plan</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Section 3: Discount Rules, Taxes & Quotation Templates -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Discounts & Taxes -->
+    <div class="space-y-6">
+        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <div class="px-5 py-3.5 border-b border-slate-200 font-bold text-sm bg-slate-50">Automated Discount Rules</div>
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 uppercase text-slate-500 border-b">
+                    <tr>
+                        <th class="px-3 py-2">Code / Name</th>
+                        <th class="px-3 py-2">Benefit</th>
+                        <th class="px-3 py-2">Min Req</th>
+                        <th class="px-3 py-2">Uses</th>
+                        <th class="px-3 py-2">Valid Until</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for d in discounts %}
+                    <tr>
+                        <td class="px-3 py-2.5 font-semibold">{{ d.code }} <div class="font-normal text-slate-500">{{ d.name }}</div></td>
+                        <td class="px-3 py-2.5 font-bold text-emerald-700">
+                            {% if d.discount_type == 'PERCENTAGE' %}{{ d.value }}%{% else %}₹{{ d.value }}{% endif %}
+                            ({{ d.get_applies_to_display }})
+                        </td>
+                        <td class="px-3 py-2.5">Qty &ge; {{ d.min_quantity }}<br>₹{{ d.min_purchase_amount }}</td>
+                        <td class="px-3 py-2.5">{{ d.times_used }} / {{ d.max_uses|default:"∞" }}</td>
+                        <td class="px-3 py-2.5">{{ d.end_date|default:"No Expiry" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if user.is_admin_role %}
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="font-bold text-sm mb-3">Add Discount Rule (Admin Only)</h3>
+            <form method="post" class="grid grid-cols-2 gap-2.5">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="discount">
+                {% for field in discount_form %}
+                    <div class="col-span-1">
+                        <label class="block text-xs font-semibold text-slate-600 mb-0.5">{{ field.label }}</label>
+                        {{ field }}
+                    </div>
+                {% endfor %}
+                <div class="col-span-2 mt-2">
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-semibold">Create Discount Rule</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="font-bold text-sm mb-3">Tax Rules ({{ taxes|length }} Configured)</h3>
+            <div class="flex flex-wrap gap-2 mb-3">
+                {% for t in taxes %}
+                    <span class="text-xs bg-slate-100 px-2.5 py-1 rounded font-semibold">{{ t.name }} ({{ t.rate_percent }}%)</span>
+                {% endfor %}
+            </div>
+            <form method="post" class="flex gap-2 items-end">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="tax">
+                <div class="flex-1"><label class="text-xs font-semibold">Tax Name</label>{{ tax_form.name }}</div>
+                <div class="w-28"><label class="text-xs font-semibold">Rate %</label>{{ tax_form.rate_percent }}</div>
+                <button type="submit" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-semibold">Add Tax</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Quotation Templates -->
+    <div class="space-y-6">
+        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <div class="px-5 py-3.5 border-b border-slate-200 font-bold text-sm bg-slate-50">Quotation Templates</div>
+            <div class="divide-y divide-slate-100 p-4 space-y-3">
+                {% for qt in templates %}
+                <div class="pt-2 first:pt-0">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-sm text-indigo-700">{{ qt.name }}</span>
+                        <span class="text-xs bg-slate-100 px-2 py-0.5 rounded">Plan: {{ qt.plan.name }} | Valid {{ qt.validity_days }}d</span>
+                    </div>
+                    <ul class="mt-1.5 text-xs text-slate-600 list-disc list-inside">
+                        {% for line in qt.lines.all %}
+                            <li>{{ line.product.name }} {% if line.variant %}({{ line.variant.attribute_value }} +₹{{ line.variant.price_extra }}){% endif %} &times; {{ line.quantity }}</li>
+                        {% empty %}
+                            <li class="text-slate-400">No default product lines added yet.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if user.is_admin_role %}
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form method="post" class="space-y-2">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="template">
+                <h4 class="font-bold text-xs uppercase text-slate-500">1. New Quotation Template</h4>
+                {% for field in template_form %}
+                    <div><label class="block text-xs font-semibold">{{ field.label }}</label>{{ field }}</div>
+                {% endfor %}
+                <button type="submit" class="w-full bg-indigo-600 text-white py-1.5 rounded text-xs font-semibold">Create Template</button>
+            </form>
+
+            <form method="post" class="space-y-2">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="template_line">
+                <h4 class="font-bold text-xs uppercase text-slate-500">2. Add Line to Template</h4>
+                {% for field in template_line_form %}
+                    <div><label class="block text-xs font-semibold">{{ field.label }}</label>{{ field }}</div>
+                {% endfor %}
+                <button type="submit" class="w-full bg-slate-800 text-white py-1.5 rounded text-xs font-semibold">Add Template Line</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900">Invoices & Automated Billing Engine</h1>
+        <p class="text-sm text-slate-500">Idempotent recurring invoice generation, tax & discount calculation, and overdue tracking.</p>
+    </div>
+    <form method="post" action="{% url 'trigger_billing_batch' %}">
+        {% csrf_token %}
+        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm">
+            ⚡ Run Billing Day Batch Now
+        </button>
+    </form>
+</div>
+
+<!-- Filters -->
+<form method="get" class="bg-white p-4 rounded-xl border border-slate-200 mb-4 flex flex-wrap gap-4 items-center">
+    <select name="status" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm">
+        <option value="">All Invoice Statuses</option>
+        {% for code, label in statuses %}
+            <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <label class="flex items-center space-x-2 text-sm">
+        <input type="checkbox" name="overdue" value="1" {% if overdue_only == '1' %}checked{% endif %} class="rounded text-red-600">
+        <span class="font-semibold text-red-600">Show Overdue Only</span>
+    </label>
+    <button type="submit" class="bg-slate-800 text-white px-4 py-1.5 rounded-lg text-sm font-medium">Filter</button>
+    <a href="{% url 'invoice_list' %}" class="text-xs text-slate-500">Reset</a>
+</form>
+
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+    <table class="w-full text-left text-sm">
+        <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
+            <tr>
+                <th class="px-4 py-3">Invoice #</th>
+                <th class="px-4 py-3">Subscription</th>
+                <th class="px-4 py-3">Customer</th>
+                <th class="px-4 py-3">Cycle Period</th>
+                <th class="px-4 py-3">Due Date</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3 text-right">Total</th>
+                <th class="px-4 py-3 text-right">Balance Due</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for inv in page_obj %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 font-bold text-indigo-600">
+                    <a href="{% url 'invoice_detail' inv.pk %}">{{ inv.invoice_number }}</a>
+                </td>
+                <td class="px-4 py-3 text-xs font-semibold">
+                    <a href="{% url 'subscription_detail' inv.subscription.pk %}" class="hover:underline">{{ inv.subscription.subscription_number }}</a>
+                </td>
+                <td class="px-4 py-3">{{ inv.customer.company_name|default:inv.customer.email }}</td>
+                <td class="px-4 py-3 text-xs">{{ inv.billing_period_start }} &rarr; {{ inv.billing_period_end }}</td>
+                <td class="px-4 py-3 text-xs {% if inv.is_overdue %}text-red-600 font-bold{% endif %}">
+                    {{ inv.due_date }} {% if inv.is_overdue %}(OVERDUE){% endif %}
+                </td>
+                <td class="px-4 py-3">
+                    <span class="px-2.5 py-0.5 text-xs rounded-full font-semibold
+                        {% if inv.status == 'PAID' %}bg-emerald-100 text-emerald-800
+                        {% elif inv.status == 'CONFIRMED' %}bg-blue-100 text-blue-800
+                        {% elif inv.status == 'CANCELLED' %}bg-slate-200 text-slate-600
+                        {% else %}bg-amber-100 text-amber-800{% endif %}">
+                        {{ inv.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-right font-medium">₹{{ inv.total_amount|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right font-bold {% if inv.amount_due > 0 %}text-red-600{% else %}text-emerald-600{% endif %}">
+                    ₹{{ inv.amount_due|floatformat:2 }}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No invoices found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brightloop Software | Subscription Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+    <nav class="bg-slate-900 text-white shadow-md no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center space-x-6">
+                    <a href="{% url 'dashboard' %}" class="text-xl font-bold tracking-tight text-indigo-400">
+                        Brightloop<span class="text-white font-normal text-sm ml-1">Subscriptions</span>
+                    </a>
+                    {% if user.is_authenticated %}
+                        {% if user.is_staff_role %}
+                            <a href="{% url 'dashboard' %}" class="text-sm hover:text-indigo-300">Finance Dashboard</a>
+                            <a href="{% url 'subscription_list' %}" class="text-sm hover:text-indigo-300">Subscriptions</a>
+                            <a href="{% url 'invoice_list' %}" class="text-sm hover:text-indigo-300">Invoices & Billing</a>
+                            <a href="{% url 'catalog' %}" class="text-sm hover:text-indigo-300">Catalog & Plans</a>
+                            {% if user.is_admin_role %}
+                                <a href="{% url 'manage_staff' %}" class="text-sm hover:text-indigo-300">Staff & Users</a>
+                            {% endif %}
+                        {% else %}
+                            <a href="{% url 'customer_portal' %}" class="text-sm hover:text-indigo-300">My Subscriptions & Invoices</a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                <div class="flex items-center space-x-4">
+                    {% if user.is_authenticated %}
+                        <span class="text-xs bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                            {{ user.email }} <strong class="text-indigo-400">({{ user.role }})</strong>
+                        </span>
+                        <form method="post" action="{% url 'logout' %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="text-xs bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded font-medium">
+                                Logout
+                            </button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="text-sm hover:text-indigo-300">Login</a>
+                        <a href="{% url 'signup' %}" class="text-sm bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded font-medium">Customer Sign Up</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {% if messages %}
+            <div class="mb-6 space-y-2 no-print">
+                {% for message in messages %}
+                    <div class="p-4 rounded-lg text-sm font-medium border
+                        {% if message.tags == 'error' %}bg-red-50 text-red-800 border-red-200
+                        {% elif message.tags == 'warning' %}bg-amber-50 text-amber-800 border-amber-200
+                        {% else %}bg-emerald-50 text-emerald-800 border-emerald-200{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

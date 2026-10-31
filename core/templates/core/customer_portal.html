@@ -1,0 +1,104 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-slate-900">Customer Self-Service Portal</h1>
+    <p class="text-sm text-slate-500">Welcome, {{ user.company_name|default:user.get_full_name }}. View and manage your subscriptions and invoices below.</p>
+</div>
+
+<!-- Customer's Subscriptions -->
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mb-8">
+    <div class="px-5 py-4 border-b border-slate-200 font-bold text-sm bg-slate-50">My Subscriptions</div>
+    <table class="w-full text-left text-sm">
+        <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b">
+            <tr>
+                <th class="px-4 py-3">Subscription #</th>
+                <th class="px-4 py-3">Plan</th>
+                <th class="px-4 py-3">Next Billing</th>
+                <th class="px-4 py-3">Expiry Date</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3 text-right">Self-Service Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for sub in my_subs %}
+            <tr>
+                <td class="px-4 py-3 font-bold text-indigo-600">
+                    <a href="{% url 'subscription_detail' sub.pk %}">{{ sub.subscription_number }}</a>
+                </td>
+                <td class="px-4 py-3 font-medium">{{ sub.plan.name }} ({{ sub.plan.get_billing_period_display }})</td>
+                <td class="px-4 py-3 text-xs">{{ sub.next_billing_date }}</td>
+                <td class="px-4 py-3 text-xs">{{ sub.expiry_date|default:"Ongoing" }}</td>
+                <td class="px-4 py-3">
+                    <span class="px-2.5 py-0.5 text-xs rounded-full font-semibold
+                        {% if sub.status == 'ACTIVE' %}bg-emerald-100 text-emerald-800
+                        {% elif sub.status == 'PAUSED' %}bg-amber-100 text-amber-800
+                        {% else %}bg-slate-100 text-slate-700{% endif %}">
+                        {{ sub.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-right space-x-1">
+                    {% if sub.status == 'QUOTATION' %}
+                        <a href="{% url 'subscription_transition' sub.pk 'confirm' %}" class="bg-emerald-600 text-white px-2.5 py-1 rounded text-xs font-semibold">Accept Quote</a>
+                    {% endif %}
+                    {% if sub.status == 'ACTIVE' and sub.plan.can_pause %}
+                        <a href="{% url 'subscription_transition' sub.pk 'pause' %}" class="bg-amber-500 text-white px-2.5 py-1 rounded text-xs font-semibold">Pause</a>
+                    {% endif %}
+                    {% if sub.status == 'PAUSED' %}
+                        <a href="{% url 'subscription_transition' sub.pk 'resume' %}" class="bg-emerald-600 text-white px-2.5 py-1 rounded text-xs font-semibold">Resume</a>
+                    {% endif %}
+                    {% if sub.plan.can_renew and sub.status in 'ACTIVE,CLOSED' %}
+                        <a href="{% url 'subscription_transition' sub.pk 'renew' %}" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-semibold">Renew</a>
+                    {% endif %}
+                    {% if sub.status != 'CLOSED' and sub.plan.can_close_early %}
+                        <a href="{% url 'subscription_transition' sub.pk 'close' %}" class="bg-red-600 text-white px-2.5 py-1 rounded text-xs font-semibold">Cancel Early</a>
+                    {% endif %}
+                    <a href="{% url 'subscription_detail' sub.pk %}" class="text-xs text-indigo-600 underline ml-2">View Lines</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">You have no active subscriptions yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Customer's Invoices -->
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+    <div class="px-5 py-4 border-b border-slate-200 font-bold text-sm bg-slate-50">My Invoices & Billing History</div>
+    <table class="w-full text-left text-sm">
+        <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b">
+            <tr>
+                <th class="px-4 py-3">Invoice #</th>
+                <th class="px-4 py-3">Subscription</th>
+                <th class="px-4 py-3">Issue Date</th>
+                <th class="px-4 py-3">Due Date</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3 text-right">Total</th>
+                <th class="px-4 py-3 text-right">Balance Due</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for inv in my_invoices %}
+            <tr>
+                <td class="px-4 py-3 font-bold text-indigo-600">
+                    <a href="{% url 'invoice_detail' inv.pk %}">{{ inv.invoice_number }}</a>
+                </td>
+                <td class="px-4 py-3 text-xs">{{ inv.subscription.subscription_number }}</td>
+                <td class="px-4 py-3 text-xs">{{ inv.issue_date }}</td>
+                <td class="px-4 py-3 text-xs">{{ inv.due_date }}</td>
+                <td class="px-4 py-3">
+                    <span class="px-2.5 py-0.5 text-xs rounded-full font-semibold
+                        {% if inv.status == 'PAID' %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                        {{ inv.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-right">₹{{ inv.total_amount|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right font-bold">₹{{ inv.amount_due|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No invoices found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
